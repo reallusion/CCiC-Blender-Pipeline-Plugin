@@ -15,14 +15,12 @@
 # along with CC/iC-Blender-Pipeline-Plugin.  If not, see <https://www.gnu.org/licenses/>.
 
 from RLPy import *
-import PySide2
 from PySide2.QtWidgets import *
 from PySide2.QtCore import *
 from PySide2.QtGui import *
 from shiboken2 import wrapInstance
-import os, shutil, socket, select, struct, time, json, random, atexit
-from . import blender, importer, exporter, cc, qt, prefs, tests, utils, vars
-from enum import IntEnum
+import os, shutil,atexit
+from . import utils, cc, qt, options
 
 CATEGORIES = {
     "Head": ESetCategory_Head,
@@ -66,12 +64,14 @@ class MorphSlider(QObject):
 
     def __init__(self, target_path, key_path):
         QObject.__init__(self)
+        OPTS = options.get_opts()
+
         dir, file = os.path.split(target_path)
         name, ext = os.path.splitext(file)
         self.target_path = target_path
         self.key_path = key_path
         self.morph_name = self.check_morph_name(name)
-        self.slider_path = prefs.DEFAULT_MORPH_SLIDER_PATH
+        self.slider_path = OPTS.DEFAULT_MORPH_SLIDER_PATH
         self.create_window()
         atexit.register(self.on_close)
 
@@ -294,6 +294,7 @@ class MorphSlider(QObject):
                     min_max = ASC.GetShapingMorphMinMax(morph_id)
                     utils.log_info(f"Morph Min/Max: {min_max[0]}/{min_max[1]}")
                     ASC.SetShapingMorphWeight(morph_id, min_max[1])
+                    RGlobal.ObjectModified(avatar, EObjectModifiedType_MorphWeight)
                     avatar.Update()
 
         self.clean_up_files()
@@ -312,3 +313,5 @@ def poke_morph_zero(avatar: RIAvatar):
         w = ASC.GetShapingMorphWeight(morph_0)
         ASC.SetShapingMorphWeight(morph_0, w + 1)
         ASC.SetShapingMorphWeight(morph_0, w)
+        RGlobal.ObjectModified(avatar, EObjectModifiedType_MorphWeight)
+        avatar.Update()

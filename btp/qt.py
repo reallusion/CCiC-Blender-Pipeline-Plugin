@@ -560,18 +560,95 @@ def spinbox(layout: QLayout, min, max, step, value, style = STYLE_NONE, read_onl
     return w
 
 
+class DTextBox(QWidget):
+    parent = None
+    textbox: QLineEdit = None
+    obj = None
+    prop = None
+    default_value = None
+    valueChanged = Signal()
+    no_update: bool = False
+
+    def __init__(self, parent, layout: QLayout, obj, prop,
+                       width=0, height=0, row=-1, col=-1, row_span=1, col_span=1, style="",
+                       align=None, update=None):
+        super().__init__()
+        setattr(parent, f"_DTextBox_{prop}_{utils.random_string(20)}", self)
+        self.parent = parent
+        self.obj = obj
+        self.prop = prop
+        value = self.get_value()
+        self.default_value = value
+        self.textbox = QLineEdit()
+        self.textbox.setText(value)
+        if style:
+            self.textbox.setStyleSheet(style)
+        if row >= 0 and col >= 0:
+            layout.addWidget(self.textbox, row, col, row_span, col_span)
+        else:
+            layout.addWidget(self.textbox)
+        if align:
+            self.textbox.setAlignment(align)
+        if width:
+            self.textbox.setFixedWidth(width)
+        if height:
+            self.textbox.setFixedHeight(height)
+        if update:
+            self.valueChanged.connect(update)
+        self.textbox.editingFinished.connect(self.textbox_value_changed)
+
+    def update_value(self):
+        value = self.get_value()
+        us = self.no_update
+        self.no_update = True
+        self.textbox.setText(value)
+        self.no_update = us
+
+    def set_value(self, value: float):
+        setattr(self.obj, self.prop, value)
+        us = self.no_update
+        self.no_update = True
+        self.textbox.setText(value)
+        self.no_update = us
+
+    def get_value(self):
+        value = None
+        if self.obj and self.prop:
+            if hasattr(self.obj, self.prop):
+                value = getattr(self.obj, self.prop)
+            else:
+                utils.log_error(f"Object: {self.obj} has no attribute {self.prop}")
+        return value
+
+    def textbox_value_changed(self):
+        if not self.no_update:
+            self.no_update = True
+            value = self.textbox.text()
+            setattr(self.obj, self.prop, value)
+            self.valueChanged.emit()
+            self.no_update = False
+
+    def setVisible(self, visible):
+        self.combo.setVisible(visible)
+
+
 class DComboBox(QWidget):
     parent = None
     combo: QComboBox = None
     obj = None
     prop = None
     default_value = None
+    default_index = 0
     valueChanged = Signal()
     no_update: bool = False
     options: list = None
+    numeric: bool = False
+    min: int = 0
+    max: int = 0
+    suffix: str = ""
 
     def __init__(self, parent, layout: QLayout, obj, prop, options: list,
-                       row=-1, col=-1, row_span=1, col_span=1, style="",
+                       row=-1, col=-1, row_span=1, col_span=1, style="", numeric=False, min=0, max=0, suffix="",
                        update=None):
         super().__init__()
         setattr(parent, f"_DComboBox_{prop}_{utils.random_string(20)}", self)
@@ -581,50 +658,92 @@ class DComboBox(QWidget):
         value = self.get_value()
         self.default_value = value
         self.options = options
+        self.numeric = numeric
+        self.min = min
+        self.max = max
+        self.suffix = suffix
         self.combo = QComboBox()
         self.combo.setStyleSheet(style)
+        if numeric:
+            self.combo.setEditable(True)
+            if min or max:
+                numeric_validator = QIntValidator(min, max)
+            else:
+                numeric_validator = QIntValidator()
+            self.combo.setValidator(numeric_validator)
         if row >= 0 and col >= 0:
             layout.addWidget(self.combo, row, col, row_span, col_span)
         else:
             layout.addWidget(self.combo)
         if options:
             for i, option in enumerate(options):
-                if type(option) is list:
+                if type(option) is list or type(option) is tuple:
                     self.combo.addItem(option[1])
                     if value == option[0]:
-                        self.combo.setCurrentIndex(i)
+                        self.default_index = i
                 else:
                     self.combo.addItem(option)
                     if value == option:
-                        self.combo.setCurrentIndex(i)
+                        self.default_index = i
+        self.update_value()
         if update:
-            value.valueChanged.connect(update)
+            self.valueChanged.connect(update)
         self.combo.currentIndexChanged.connect(self.combo_value_changed)
 
-    def update_value(self):
+    def check_value(self):
         value = self.get_value()
         us = self.no_update
         self.no_update = True
-        for i, option in enumerate(self.options):
-            if type(option) is list:
-                if value == option[0]:
-                    self.combo.setCurrentIndex(i)
-            else:
-                if value == option:
-                    self.combo.setCurrentIndex(i)
+        if self.options and self.numeric:
+            has_value = False
+            for i, option in enumerate(self.options):
+                if type(option) is list or type(option) is tuple:
+                    if value == option[0]:
+                        has_value = True
+                        break
+                else:
+                    if value == option:
+                        has_value = True
+                        break
+            if not has_value:
+                if value >= self.min and value <= self.max:
+                    text = f"{str(value)} {self.suffix}" if self.suffix else str(value)
+                    self.options.append((value, text))
+                    self.combo.addItem(text)
+        self.no_update = us
+
+    def update_value(self):
+        self.check_value()
+        value = self.get_value()
+        us = self.no_update
+        self.no_update = True
+        if self.options:
+            for i, option in enumerate(self.options):
+                if type(option) is list or type(option) is tuple:
+                    if value == option[0]:
+                        self.combo.setCurrentIndex(i)
+                        break
+                else:
+                    if value == option:
+                        self.combo.setCurrentIndex(i)
+                        break
         self.no_update = us
 
     def set_value(self, value: float):
         setattr(self.obj, self.prop, value)
+        self.check_value()
         us = self.no_update
         self.no_update = True
-        for i, option in enumerate(self.options):
-            if type(option) is list:
-                if value == option[1]:
-                    self.combo.setCurrentIndex(i)
-            else:
-                if value == option:
-                    self.combo.setCurrentIndex(i)
+        if self.options:
+            for i, option in enumerate(self.options):
+                if type(option) is list or type(option) is tuple:
+                    if value == option[1]:
+                        self.combo.setCurrentIndex(i)
+                        break
+                else:
+                    if value == option:
+                        self.combo.setCurrentIndex(i)
+                        break
         self.no_update = us
 
     def get_value(self):
@@ -640,8 +759,20 @@ class DComboBox(QWidget):
         if not self.no_update:
             self.no_update = True
             index = self.combo.currentIndex()
+            if self.options and self.numeric:
+                if index >= len(self.options):
+                    try:
+                        value = int(self.combo.currentText())
+                    except:
+                        value = None
+                    if value is not None and value >= self.min and value <= self.max:
+                        text = f"{str(value)} {self.suffix}" if self.suffix else str(value)
+                        self.options.append((value, text))
+                        self.combo.setItemText(index, text)
+                    else:
+                        index = self.default_index
             option = self.options[index]
-            if type(option) is list:
+            if type(option) is list or type(option) is tuple:
                 value = option[0]
             else:
                 value = option
@@ -665,7 +796,8 @@ class DCheckBox(QWidget):
     no_update: bool = False
 
     def __init__(self, parent, layout: QLayout, label, obj, prop,
-                 readOnly=False, row=-1, col=-1, skip=0, label_style="", checkbox_style="",
+                 readOnly=False, row=-1, col=-1, row_span=1, col_span=1, skip=0,
+                 label_style="", checkbox_style="",
                  update=None, clicked=None, default_value=None):
         super().__init__()
         setattr(parent, f"_DCheckBox_{prop}_{utils.random_string(20)}", self)
@@ -675,16 +807,22 @@ class DCheckBox(QWidget):
         value = self.get_value()
         self.default_value = default_value if default_value is not None else value
         #
-        if label:
-            self.label = QLabelClickable()
-            self.label.setText(label)
-            self.label.setStyleSheet(label_style)
+        #if label:
+        #    self.label = QLabelClickable()
+        #    self.label.setText(label)
+        #    self.label.setStyleSheet(label_style)
         #
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(value)
         self.checkbox.setStyleSheet(checkbox_style)
+        if label:
+            self.checkbox.setText(label)
         #
-        self.add_to_layout(layout, row, col, skip)
+        if row >= 0 and col >= 0:
+            layout.addWidget(self.checkbox, row, col, row_span, col_span)
+        else:
+            layout.addWidget(self.checkbox)
+        #self.add_to_layout(layout, row, col, row_span, col_span, skip)
         #
         if update:
             self.valueChanged.connect(update)
@@ -694,12 +832,12 @@ class DCheckBox(QWidget):
             self.label.clicked.connect(self.reset)
         self.checkbox.stateChanged.connect(self.checkbox_value_changed)
 
-    def add_to_layout(self, layout: QLayout, row, col, skip=0):
+    def add_to_layout(self, layout: QLayout, row, col, row_span, col_span, skip=0):
         if row >= 0 and col >= 0:
             if self.label:
-                layout.addWidget(self.label, row, col)
+                layout.addWidget(self.label, row, col, row_span, 1)
                 col += 1 + skip
-            layout.addWidget(self.checkbox, row, col)
+            layout.addWidget(self.checkbox, row, col, row_span, col_span)
         else:
             if self.label:
                 layout.addWidget(self.label)
@@ -763,7 +901,8 @@ class DSpinBox(QWidget):
     no_update: bool = False
 
     def __init__(self, parent, layout: QLayout, label, obj, prop, min, max, step, scale=100,
-                 readOnly=False, row=-1, col=-1, skip=0, label_style="", spinbox_style="",
+                 readOnly=False, row=-1, col=-1, row_span=1, col_span=1, skip=0,
+                 label_style="", spinbox_style="",
                  update=None, clicked=None, default_value=None):
         super().__init__()
         setattr(parent, f"_DSpinBox_{prop}_{utils.random_string(20)}", self)
@@ -792,7 +931,7 @@ class DSpinBox(QWidget):
         self.spinbox.setSingleStep(step)
         self.spinbox.setStyleSheet(spinbox_style)
         #
-        self.add_to_layout(layout, row, col, skip)
+        self.add_to_layout(layout, row, col, row_span, col_span, skip)
         #
         if update:
             self.valueChanged.connect(update)
@@ -802,12 +941,12 @@ class DSpinBox(QWidget):
             self.label.clicked.connect(self.reset)
         self.spinbox.valueChanged.connect(self.spinbox_value_changed)
 
-    def add_to_layout(self, layout: QLayout, row, col, skip=0):
+    def add_to_layout(self, layout: QLayout, row, col, row_span, col_span, skip=0):
         if row >= 0 and col >= 0:
             if self.label:
-                layout.addWidget(self.label, row, col)
+                layout.addWidget(self.label, row, col, row_span, 1)
                 col += 1 + skip
-            layout.addWidget(self.spinbox, row, col)
+            layout.addWidget(self.spinbox, row, col, row_span, col_span)
         else:
             if self.label:
                 layout.addWidget(self.label)
@@ -974,7 +1113,7 @@ class DSliderSpin(QWidget):
         if self.reset_props:
             for prop in self.reset_props:
                 if prop:
-                    control = get_dcontrol(self.parent, self.obj, prop)
+                    control = find_dcontrol(self.parent, self.obj, prop)
                     if control and control != self:
                         control.reset()
         self.clicked.emit()
@@ -1016,7 +1155,7 @@ class DColorPicker(QWidget):
     valueChanged = Signal()
 
     def __init__(self, parent, layout, label, obj, prop, text="", width=0, height=BUTTON_HEIGHT,
-                 row=-1, col=-1, skip=0, update=None, reset=None, label_style="", tooltip=""):
+                 row=-1, col=-1, row_span=1, col_span=1, skip=0, update=None, reset=None, label_style="", tooltip=""):
         super().__init__()
         setattr(parent, f"_DColorPicker_{prop}_{utils.random_string(20)}", self)
         self.parent = parent
@@ -1040,7 +1179,7 @@ class DColorPicker(QWidget):
             if label:
                 layout.addWidget(self.label, row, col)
                 col += 1 + skip
-            layout.addWidget(self.button, row, col)
+            layout.addWidget(self.button, row, col, row_span, col_span)
         else:
             if label:
                 layout.addWidget(self.label)
@@ -1092,7 +1231,7 @@ class DColorPicker(QWidget):
 
 
 
-def get_dcontrol(parent, obj, prop):
+def find_dcontrol(parent, obj, prop):
     members = dir(parent)
     if obj and prop:
         for member in members:

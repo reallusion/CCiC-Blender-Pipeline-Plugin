@@ -17,7 +17,8 @@
 from RLPy import *
 del abs
 import os, json, math
-from . import utils, vars
+from . import vars, utils
+from . error import ErrorCode, error_report, error_reset, error_show
 from enum import IntEnum
 
 
@@ -25,14 +26,14 @@ SHADER_MAPS = { # { "Json_shader_name" : "CC3_shader_name", }
     "Tra": "Traditional",
     "Pbr": "PBR",
     "RLEyeTearline": "Digital_Human Tear Line",
-    "RLEyeTearline_Plus": "New Digital_Human Tear Line",
+    "RLEyeTearline_Plus": "Digital_Human Tear Line (HD)",
     "RLHair": "Digital_Human Hair",
     "RLTeethGum": "Digital_Human Teeth Gums",
     "RLEye": "Digital_Human Eye",
     "RLHead": "Digital_Human Head",
     "RLSkin": "Digital_Human Skin",
     "RLEyeOcclusion": "Digital_Human Eye Occlusion",
-    "RLEyeOcclusion_Plus": "New Digital_Human Eye Occlusion",
+    "RLEyeOcclusion_Plus": "Digital_Human Eye Occlusion (HD)",
     "RLTongue": "Digital_Human Tongue",
     "RLSSS": "SSS",
 }
@@ -1003,6 +1004,7 @@ def get_avatar_mesh_materials(avatar, exclude_mesh_names=None, exclude_material_
                               exact=False):
 
     mesh_materials = []
+    done = []
 
     if avatar:
 
@@ -1025,6 +1027,11 @@ def get_avatar_mesh_materials(avatar, exclude_mesh_names=None, exclude_material_
             obj = find_actor_object(avatar, mesh_name)
             if obj:
 
+                oid = (obj.GetID(), mesh_name)
+                if oid in done:
+                    continue
+                done.append(oid)
+
                 utils.log_info(f"Actor Object: {obj.GetName()} ({mesh_name})")
                 utils.log_indent()
 
@@ -1036,6 +1043,12 @@ def get_avatar_mesh_materials(avatar, exclude_mesh_names=None, exclude_material_
 
                     if material_filter and material_filter(mesh_name):
                         continue
+
+                    mid = (obj.GetID(), mesh_name, mat_name)
+                    if mid in done:
+                        utils.log_info(f" - Skipping Duplicate! ({mid})")
+                        continue
+                    done.append(mid)
 
                     utils.log_info(f"Mesh / Material: {mesh_name} / {mat_name}")
                     utils.log_indent()
@@ -1062,9 +1075,17 @@ def get_avatar_mesh_materials(avatar, exclude_mesh_names=None, exclude_material_
 def is_cc():
     return RApplication.GetProductName() == "Character Creator"
 
+def is_cc5():
+    return RApplication.GetProductName() == "Character Creator" and RApplication.GetApiMajorVersion() == 5
+
+def is_cc4():
+    return RApplication.GetProductName() == "Character Creator" and RApplication.GetApiMajorVersion() == 4
 
 def is_iclone():
     return RApplication.GetProductName() == "iClone"
+
+def is_iclone8():
+    return RApplication.GetProductName() == "iClone" and RApplication.GetApiMajorVersion() == 8
 
 
 def find_actor_source_meshes(imported_mesh_name, imported_obj_name, actor: RIAvatar):
@@ -1076,30 +1097,44 @@ def find_actor_source_meshes(imported_mesh_name, imported_obj_name, actor: RIAva
         # accessories can cause mesh renames with _0 _1 _2 suffixes added
         if imported_mesh_name[-1].isdigit() and imported_mesh_name[-2] == "_":
             try_names.add(imported_mesh_name[:-2])
+        if imported_mesh_name.endswith("_Shape"):
+            try_names.add(imported_mesh_name[:-6])
         safe_imported_obj_name = imported_obj_name
         if imported_obj_name:
             safe_imported_obj_name = safe_export_name(imported_obj_name)
             try_names.add(imported_obj_name)
             try_names.add(safe_imported_obj_name)
+            if imported_obj_name.endswith("_Shape"):
+                try_names.add(imported_obj_name[:-6])
 
-        #utils.log_info(f"Try Names: {try_names}")
+        utils.log_info(f"Try Names: {try_names}")
+
+        found = []
 
         # first try to match mesh names directly
         for obj in objects:
             obj_name = obj.GetName()
+            # the object name also works in avatars
+            if obj_name in try_names:
+                found.append(obj_name)
             rl_meshes = obj.GetMeshNames()
             if rl_meshes:
-                #utils.log_info(f"Object: {obj.GetName()}, Mesh Names: {rl_meshes}")
                 for mesh_name in rl_meshes:
                     if mesh_name in try_names:
-                        return [mesh_name]
+                        found.append(mesh_name)
+
+        if found:
+            return found
 
         # then try to match object names
-        if imported_obj_name:
-            for obj in objects:
-                obj_name = obj.GetName()
-                if obj_name == imported_obj_name or obj_name == safe_imported_obj_name:
-                    return obj.GetMeshNames()
+        #if imported_obj_name:
+        #    for obj in objects:
+        #        obj_name = obj.GetName()
+        #        if obj_name == imported_obj_name or obj_name == safe_imported_obj_name:
+        #            mesh_names = obj.GetMeshNames()
+        #            for mesh_name in mesh_names:
+        #                if mesh_name not in found:
+        #                    found.append(mesh_name)
 
         # try a partial match, but only if there is only one result
         partial_mesh_match = None
@@ -1116,7 +1151,7 @@ def find_actor_source_meshes(imported_mesh_name, imported_obj_name, actor: RIAva
                         # only count 1 match per try set
                         break
         if partial_mesh_count == 1:
-            return [partial_mesh_match]
+            found.append(partial_mesh_match)
 
         # try a partial match on the object names
         partial_obj_match = None
@@ -1128,9 +1163,9 @@ def find_actor_source_meshes(imported_mesh_name, imported_obj_name, actor: RIAva
                 if not partial_obj_match:
                     partial_obj_match = obj
         if partial_obj_count == 1:
-            return partial_obj_match.GetMeshNames()
+            found.extend(partial_obj_match.GetMeshNames())
 
-        return []
+        return found
 
 
 def get_first_avatar():
@@ -1149,6 +1184,16 @@ def get_selected_avatars():
         if obj in all_avatars and obj not in avatars:
             avatars.append(obj)
     return avatars
+
+
+def get_selected_props():
+    objects = get_selected_actor_objects()
+    all_props = RScene.GetProps() + RScene.GetMDProps()
+    props = []
+    for obj in objects:
+        if obj in all_props and obj not in props:
+            props.append(obj)
+    return props
 
 
 def get_selected_sendable(obj: RIObject):
@@ -1909,19 +1954,17 @@ def is_camera(obj):
     return False
 
 
-def begin_timeline_scan():
+def begin_timeline_scan(fps: RFps):
     start_time: RTime = RGlobal.GetStartTime()
     RGlobal.SetTime(start_time)
     current_time: RTime = RGlobal.GetTime()
-    fps: RFps = RGlobal.GetFps()
     current_frame = fps.GetFrameIndex(current_time)
     return current_time, current_frame
 
 
-def next_timeline_scan():
+def next_timeline_scan(fps: RFps):
     end_time: RTime = RGlobal.GetEndTime()
     current_time: RTime = RGlobal.GetTime()
-    fps: RFps = RGlobal.GetFps()
     if current_time.ToInt() < end_time.ToInt():
         next_time = fps.GetNextFrameTime(current_time)
         next_frame = fps.GetFrameIndex(next_time)
@@ -1936,11 +1979,12 @@ def end_timeline_scan(current_time):
     RGlobal.SetTime(current_time)
 
 
-def get_all_camera_light_data(no_animation=False):
+def get_all_camera_light_data(no_animation=False, fps: RFps=None):
     lights = RScene.FindObjects(EObjectType_Light | EObjectType_DirectionalLight |
                                 EObjectType_SpotLight | EObjectType_PointLight)
     cameras = RScene.FindObjects(EObjectType_Camera)
-    fps: RFps = RGlobal.GetFps()
+    if not fps:
+        fps: RFps = RGlobal.GetFps()
     switch_data = RScene.GetSwitchCameraFrameIndexs(fps)
     all_data = []
     if lights or cameras:
@@ -1960,12 +2004,12 @@ def get_all_camera_light_data(no_animation=False):
                 if light_data:
                     frame_lights.append(light_data)
             for camera in cameras:
-                camera_data = get_camera_data(camera, frame, switch_data)
+                camera_data = get_camera_data(camera, fps, frame, switch_data)
                 if camera_data:
                     frame_cameras.append(camera_data)
             all_data.append(frame_data)
         else:
-            time, frame = begin_timeline_scan()
+            time, frame = begin_timeline_scan(fps)
             start_time = time
             is_next = True
             while is_next:
@@ -1982,11 +2026,11 @@ def get_all_camera_light_data(no_animation=False):
                     if light_data:
                         frame_lights.append(light_data)
                 for camera in cameras:
-                    camera_data = get_camera_data(camera, frame, switch_data)
+                    camera_data = get_camera_data(camera, fps, frame, switch_data)
                     if camera_data:
                         frame_cameras.append(camera_data)
                 all_data.append(frame_data)
-                is_next, time, frame = next_timeline_scan()
+                is_next, time, frame = next_timeline_scan(fps)
             end_timeline_scan(start_time)
     return all_data
 
@@ -2141,15 +2185,15 @@ def get_light_data(light: RILight):
     multiplier: float = light.GetMultiplier()
     current_time = RGlobal.GetTime()
 
-    light_range: float = 1000
-    angle: float = 0
-    falloff: float = 100
-    attenuation: float = 100
+    light_range: float = 1000.0
+    angle: float = 60.0
+    falloff: float = 100.0
+    attenuation: float = 100.0
     transmission: bool = False
     is_tube: bool = False
-    tube_length: float = 0
-    tube_radius: float = 0
-    tube_soft_radius: float = 0
+    tube_length: float = 0.0
+    tube_radius: float = 0.0
+    tube_soft_radius: float = 0.0
     is_rectangle: bool = False
     rect: RVector2 = RVector2(0,0)
     cast_shadow: bool = False
@@ -2158,7 +2202,10 @@ def get_light_data(light: RILight):
 
     if spot_light:
         light_range = spot_light.GetRange()
-        status, angle, falloff, attenuation = spot_light.GetSpotLightBeam(angle, falloff, attenuation)
+        try:
+            status, angle, falloff, attenuation = spot_light.GetSpotLightBeam(angle, falloff, attenuation)
+        except:
+            error_report(ErrorCode.SPOTLIGHT_01)
         transmission = spot_light.GetTransmission()
         inverse_square = spot_light.GetInverseSquare()
         is_tube = spot_light.IsTubeShape()
@@ -2225,9 +2272,8 @@ def is_camera_switch_active(camera: RICamera, frame, switch_data):
     return False
 
 
-def get_camera_data(camera: RICamera, frame, switch_data = None):
+def get_camera_data(camera: RICamera, fps: RFps, frame, switch_data = None):
     if switch_data is None:
-        fps: RFps = RGlobal.GetFps()
         switch_data = RScene.GetSwitchCameraFrameIndexs(fps)
     T = type(camera)
     if T is not RICamera:

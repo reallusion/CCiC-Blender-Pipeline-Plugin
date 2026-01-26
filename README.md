@@ -72,7 +72,9 @@ Changelog
 =========
 
 ### 2.4.0
--
+- Fix/Update to mesh replace.
+- Fix to expression import/update for Go-CC.
+- DataLink motion exports use Blender FPS (when connected).
 
 ### 2.3.4
 - Blender Scripts Transformer fix added.

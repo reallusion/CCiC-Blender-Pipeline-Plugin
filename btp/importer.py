@@ -774,8 +774,11 @@ class Importer:
                             sliders.extend(categories_json[category])
                             utils.log(f"Importing Gathered Expressions: ...")
                             utils.log(f" - Path: {self.path}")
-                            res: RLPy.RStatus = facial_profile.ImportMorphs(self.path, True, sliders, category)
-
+                            #if categories_json[category]:
+                            #    res: RLPy.RStatus = facial_profile.ImportMorphs(self.path, True, categories_json[category], category)
+                            #    if res.IsError():
+                            #        utils.log_error(f"Expression import failed!")
+                    res: RLPy.RStatus = facial_profile.ImportMorphs(self.path, True, sliders, "CUSTOM")
                     if res.IsError():
                         utils.log_error(f"Expression import failed!")
 

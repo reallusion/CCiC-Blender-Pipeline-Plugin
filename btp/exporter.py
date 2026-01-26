@@ -841,7 +841,9 @@ class Exporter:
 
         options2 = (EExportFbxOptions2__None | EExportFbxOptions2_ResetBoneScale
                                              | EExportFbxOptions2_ResetSelfillumination
-                                             | EExportFbxOptions2_RenameDuplicateMaterialName)
+                                             | EExportFbxOptions2_RenameDuplicateMaterialName
+                                            #| EExportFbxOptions2_RenameDuplicateMorphName
+                                             )
 
         options3 = (EExportFbxOptions3__None | EExportFbxOptions3_ExportJson
                                              | EExportFbxOptions3_ExportVertexColor)
@@ -940,7 +942,9 @@ class Exporter:
             options1 = options1 | EExportFbxOptions_RemoveAllMeshKeepMorph
 
         options2 = (EExportFbxOptions2__None | EExportFbxOptions2_ResetBoneScale
-                                             | EExportFbxOptions2_ResetSelfillumination)
+                                             | EExportFbxOptions2_ResetSelfillumination
+                                            #| EExportFbxOptions2_RenameDuplicateMorphName
+                                             )
 
         options3 = (EExportFbxOptions3__None)
 

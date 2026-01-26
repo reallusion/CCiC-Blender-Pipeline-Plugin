@@ -53,6 +53,7 @@ class OpCodes(IntEnum):
     INVALID = 55
     SAVE = 60
     FILE = 75
+    FPS = 80
     MORPH = 90
     MORPH_UPDATE = 91
     REPLACE_MESH = 95
@@ -1286,6 +1287,7 @@ class LinkService(QObject):
                 if LI(): log_info(f"Connected to: {self.remote_app} {self.remote_version} / {self.remote_addon}")
                 if LI(): log_info(f"Using file path: {self.remote_path}")
                 if LI(): log_info(f"Client is connecting {('Locally' if self.remote_is_local else 'Remotely')}")
+                if LI(): log_info(f"Client FPS: {self.remote_fps.ToInt()}")
             self.service_initialize()
             if data:
                 self.changed.emit()
@@ -1532,6 +1534,7 @@ class DataLink(QObject):
     callback_id = None
     # UI
     label_header: QLabel = None
+    label_fps: QLabel = None
     button_link: QPushButton = None
     context_frame: QVBoxLayout = None
     info_label_name: QLabel = None
@@ -1674,6 +1677,7 @@ class DataLink(QObject):
                                options=[(0, "Use Project"), (12, "12 fps"), (24, "24 fps (Film)"), (25, "25 fps (PAL)"), (30, "30 fps (NTSC)"), ((60, "60 fps (iClone)"))],
                                numeric=True, min=1, max=120, suffix="fps", style=qt.STYLE_RL_BOLD,
                                row=1, col=1, update=self.write_options)
+        self.label_fps = qt.label(grid, "", style=qt.STYLE_RL_BOLD, row=1, col=1)
         # 2
         qt.label(grid, f"Prefix:", row=1, col=2)
         # 3
@@ -1803,6 +1807,7 @@ class DataLink(QObject):
         qt.label(grid, "Link ID", style=qt.STYLE_BOLD, row=1, col=0)
         self.info_label_link_id = qt.label(grid, "", row=1, col=1, no_size=True)
 
+        qt.hide(self.label_fps)
         self.show_link_state()
 
     def on_show_hide(self, visible):
@@ -1982,6 +1987,18 @@ class DataLink(QObject):
         qt.enable(self.button_send_scene)
         # context info
 
+        # fps
+        OPTS = options.get_opts()
+        prop_name = "CC_EXPORT_FPS" if cc.is_cc() else "IC_EXPORT_FPS"
+        fps_combo = qt.find_dcontrol(self, OPTS, prop_name)
+        if self.is_connected():
+            self.update_fps()
+            qt.show(self.label_fps)
+            qt.hide(fps_combo)
+        else:
+            qt.hide(self.label_fps)
+            qt.show(fps_combo)
+
         if avatar:
             self.context_frame.show()
             self.info_label_name.setText(avatar.GetName())
@@ -2040,6 +2057,11 @@ class DataLink(QObject):
             if LI(): log_info(text)
         if events:
             qt.do_events()
+
+    def update_fps(self):
+        fps = self.get_link_fps().ToInt()
+        fps_text = f"  {fps} fps (Blender)"
+        self.label_fps.setText(fps_text)
 
     def update_motion_prefix(self):
         self.motion_prefix = self.textbox_motion_prefix.text()
@@ -2161,6 +2183,9 @@ class DataLink(QObject):
         if op_code == OpCodes.INVALID:
             self.receive_invalid(data)
 
+        if op_code == OpCodes.FPS:
+            self.receive_fps(data)
+
         if op_code == OpCodes.TEMPLATE:
             self.receive_actor_templates(data)
 
@@ -2181,6 +2206,9 @@ class DataLink(QObject):
 
         if op_code == OpCodes.SEQUENCE_ACK:
             self.receive_sequence_ack(data)
+
+        if op_code == OpCodes.FPS:
+            self.receive_fps(data)
 
         if op_code == OpCodes.CHARACTER:
             self.receive_character_import(data)
@@ -2291,6 +2319,7 @@ class DataLink(QObject):
             link_service.remote_fps = RFps(float(fps))
         else:
             link_service.remote_fps = RFps.Fps60
+        self.update_fps()
         return link_service.remote_fps
 
     def get_link_fps(self):
@@ -2435,6 +2464,7 @@ class DataLink(QObject):
         """
         TODO: Send sub object link id's?
         """
+        OPTS = options.get_opts()
         self.update_link_status(f"Exporting Avatar: {actor.name}", True)
         self.send_notify(f"Exporting Avatar: {actor.name}")
         # Determine export path
@@ -2461,11 +2491,16 @@ class DataLink(QObject):
             "motion_prefix": self.motion_prefix,
             "use_fake_user": self.use_fake_user,
             "set_keyframes": self.set_keyframes,
+            "fps": self.get_link_fps().ToInt(),
         })
         self.send(OpCodes.CHARACTER, export_data)
+        # sending a character without animation always sends at 60fps which changes blenders fps...
+        #if OPTS.get_export_animation() == "No Animation":
+        #    self.send_fps()
         self.update_link_status(f"Avatar Sent: {actor.name}")
 
     def send_prop(self, actor: LinkActor):
+        OPTS = options.get_opts()
         self.update_link_status(f"Exporting Prop: {actor.name}", True)
         self.send_notify(f"Exporting Prop: {actor.name}")
         # Determine export path
@@ -2491,8 +2526,12 @@ class DataLink(QObject):
             "motion_prefix": self.motion_prefix,
             "use_fake_user": self.use_fake_user,
             "set_keyframes": self.set_keyframes,
+            "fps": self.get_link_fps().ToInt(),
         })
         self.send(OpCodes.PROP, export_data)
+        # sending a prop without animation always sends at 60fps which changes blenders fps...
+        #if OPTS.get_export_animation() == "No Animation":
+        #    self.send_fps()
         self.update_link_status(f"Prop Sent: {actor.name}")
         if PROP_FIX:
             self.do_send_pose(actor)
@@ -2580,12 +2619,12 @@ class DataLink(QObject):
         if not actors:
             actors = self.get_selected_actors()
 
+        actor: LinkActor
+
         # because it is faster to send all the lights and cameras at once (only one scene scan)
         lights_cameras = [ actor for actor in actors if (actor.is_light() or actor.is_camera()) ]
         if lights_cameras:
             self.send_lights_cameras(lights_cameras)
-
-        actor: LinkActor
 
         # send props
         for actor in actors:
@@ -3265,6 +3304,21 @@ class DataLink(QObject):
         RGlobal.SetStartTime(start_time)
         RGlobal.SetEndTime(end_time)
         RGlobal.SetTime(current_time)
+
+    def send_fps(self):
+        OPTS = options.get_opts()
+        fps = int(OPTS.get_link_fps())
+        fps_data = {
+            "fps": fps
+        }
+        self.send(OpCodes.FPS, encode_from_json(fps_data))
+
+    def receive_fps(self, data):
+        fps_data = decode_to_json(data)
+        fps = int(fps_data.get("fps", 60))
+        self.update_link_status(f"FPS Received: {fps}")
+        utils.log_info(f"Receive FPS: {fps}")
+        self.set_link_fps(fps)
 
     def select_scene(self):
         all_actor_objects = cc.get_all_actor_objects()
@@ -4030,23 +4084,22 @@ class DataLink(QObject):
         if actor:
             avatar: RIAvatar = actor.object
             if LI(): log_info(f"Replace Mesh: {obj_name} / {mesh_name}")
-            results = cc.find_actor_source_meshes(mesh_name, obj_name, avatar)
+            results = cc.find_actor_source_meshes_2(mesh_name, obj_name, avatar)
             if results:
-                for cc_mesh_name in results:
+                tried = []
+                for mesh in results:
+                    tried.append(mesh.GetName())
+                    cc_mesh_name = mesh.GetName()
                     if LI(): log_info(f" - Trying Replace Mesh: {cc_mesh_name}")
-                    status = None
-                    try:
-                        status: RStatus = avatar.ReplaceMesh(cc_mesh_name, obj_file_path, True, False)
-                    except:
-                        error_report(ErrorCode.REPLACE_MESH_01)
-                    if status and status == RStatus.Success:
+                    success = cc.safe_replace_mesh(avatar, mesh, obj_name, cc_mesh_name, obj_file_path)
+                    if success:
                         RGlobal.ForceViewportUpdate()
                         if LI(): log_info(f" - Replace mesh success!")
                         self.update_link_status(f"Replace Mesh: {actor.name} / {cc_mesh_name}")
                         return
                     else:
                         if LI(): log_info(f" - Replace mesh failed: {cc_mesh_name}")
-                qt.message_box("Error", f"Replace Mesh Failed!: {obj_name} / {mesh_name}")
+                qt.message_box("Error", f"Replace Mesh Failed!: {obj_name} / {mesh_name}\n    Tried meshes: {tried}")
             else:
                 qt.message_box("Error", f"Unable to determine source mesh for replacement: {obj_name} / {mesh_name}")
             return

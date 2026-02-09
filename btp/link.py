@@ -80,6 +80,7 @@ class OpCodes(IntEnum):
     MOTION = 240
     REQUEST = 250
     CONFIRM = 251
+    RELINK = 300
 
 
 VISEME_NAME_MAP = {
@@ -224,8 +225,7 @@ class LinkActor():
 
     def get_skeleton_component(self) -> RISkeletonComponent:
         if self.object:
-            if cc.is_avatar(self.object) or cc.is_prop(self.object):
-                return self.object.GetSkeletonComponent()
+            return cc.safe_get_skeleton_component(self.object)
         return None
 
     def get_face_component(self) -> RIFaceComponent:
@@ -592,52 +592,51 @@ def set_project_range(end_time: RTime):
 
 def get_clip_at_or_before(avatar: RIAvatar, time: RTime):
     fps = get_local_fps()
-    SC: RISkeletonComponent = avatar.GetSkeletonComponent()
-    num_clips = SC.GetClipCount()
     found_clip: RIClip = None
-    nearest_end_time: RTime = None
-    for i in range(0, num_clips):
-        clip:RIClip = SC.GetClip(i)
-        clip_start = clip.ClipTimeToSceneTime(fps.IndexedFrameTime(0))
-        length = clip.GetClipLength()
-        clip_end = clip.ClipTimeToSceneTime(length)
-        if time >= clip_start and time <= clip_end:
-            found_clip = clip
-            return found_clip
-        elif time > clip_end:
-            if not found_clip or clip_end > nearest_end_time:
+    SC = cc.safe_get_skeleton_component(avatar)
+    if SC:
+        num_clips = SC.GetClipCount()
+        nearest_end_time: RTime = None
+        for i in range(0, num_clips):
+            clip:RIClip = SC.GetClip(i)
+            clip_start = clip.ClipTimeToSceneTime(fps.IndexedFrameTime(0))
+            length = clip.GetClipLength()
+            clip_end = clip.ClipTimeToSceneTime(length)
+            if time >= clip_start and time <= clip_end:
                 found_clip = clip
-                nearest_end_time = clip_end
+                return found_clip
+            elif time > clip_end:
+                if not found_clip or clip_end > nearest_end_time:
+                    found_clip = clip
+                    nearest_end_time = clip_end
     return found_clip
 
 
 def make_avatar_clip(avatar, start_time, num_frames):
     fps = get_local_fps()
-    SC: RISkeletonComponent = avatar.GetSkeletonComponent()
-    clip: RIClip = SC.AddClip(start_time)
-    length = fps.IndexedFrameTime(num_frames)
-    clip.SetLength(length)
+    clip: RIClip = None
+    SC = cc.safe_get_skeleton_component(avatar)
+    if SC:
+        clip = SC.AddClip(start_time)
+        length = fps.IndexedFrameTime(num_frames)
+        clip.SetLength(length)
     return clip
 
 
 def finalize_avatar_clip(avatar, clip):
-    SC: RISkeletonComponent = avatar.GetSkeletonComponent()
-    SC.BakeFkToIk(RTime.FromValue(0), True)
+    SC = cc.safe_get_skeleton_component(avatar)
+    if SC:
+        SC.BakeFkToIk(RTime.FromValue(0), True)
 
 
 def apply_pose(actor: LinkActor, time: RTime, pose_data, shape_data):
-
-    all_clips = True
-    for obj_id, obj_def in actor.skin_objects.items():
-        obj = obj_def["object"]
-        SC: RISkeletonComponent = obj.GetSkeletonComponent()
-        #clip: RIClip = SC.GetClipByTime(time)
-        clip = obj_def["clip"]
-        if clip:
+    for obj_id, skin_def in actor.skin_objects.items():
+        obj = skin_def["object"]
+        SC = skin_def["SC"]
+        clip = skin_def["clip"]
+        if obj and SC and clip:
             clip_time = clip.SceneTimeToClipTime(time)
-            obj_def["clip_time"] = clip_time
-        else:
-            all_clips = False
+            skin_def["clip_time"] = clip_time
 
     root_rot = RQuaternion(RVector4(0,0,0,1))
     root_tra = RVector3(0,0,0)
@@ -645,8 +644,13 @@ def apply_pose(actor: LinkActor, time: RTime, pose_data, shape_data):
     apply_world_fk_pose(actor, actor.skin_tree,
                         pose_data, shape_data,
                         root_rot, root_tra, root_sca)
-    scene_time = clip.ClipTimeToSceneTime(clip_time)
-    SC.BakeFkToIk(scene_time, False)
+
+    for obj_id, skin_def in actor.skin_objects.items():
+        obj = skin_def["object"]
+        SC: RISkeletonComponent = skin_def["SC"]
+        clip = skin_def["clip"]
+        if obj and SC and clip:
+            SC.BakeFkToIk(time, False)
 
 
 def get_pose_local(actor: LinkActor):
@@ -666,19 +670,20 @@ def get_pose_local(actor: LinkActor):
 
 
 def get_pose_world(avatar: RIAvatar):
-    SC: RISkeletonComponent = avatar.GetSkeletonComponent()
-    skin_bones = SC.GetSkinBones()
     pose = {}
-    for bone in skin_bones:
-        T: RTransform = bone.WorldTransform()
-        t: RVector3 = T.T()
-        r: RQuaternion = T.R()
-        s: RVector3 = T.S()
-        pose[bone.GetName()] = [
-            t.x, t.y, t.z,
-            r.x, r.y, r.z, r.w,
-            s.x, s.y, s.z,
-        ]
+    SC = cc.safe_get_skeleton_component(avatar)
+    if SC:
+        skin_bones = SC.GetSkinBones()
+        for bone in skin_bones:
+            T: RTransform = bone.WorldTransform()
+            t: RVector3 = T.T()
+            r: RQuaternion = T.R()
+            s: RVector3 = T.S()
+            pose[bone.GetName()] = [
+                t.x, t.y, t.z,
+                r.x, r.y, r.z, r.w,
+                s.x, s.y, s.z,
+            ]
     return pose
 
 
@@ -1574,6 +1579,10 @@ class DataLink(QObject):
     service: LinkService = None
     # Data
     data = LinkData()
+    #
+    enable_request_type_actors = True
+    enable_request_type_motions = True
+    enable_request_type_scene = True
 
 
     def __init__(self):
@@ -1985,7 +1994,6 @@ class DataLink(QObject):
                 qt.enable(self.button_send)
                 qt.enable(self.button_morph)
         qt.enable(self.button_send_scene)
-        # context info
 
         # fps
         OPTS = options.get_opts()
@@ -1999,6 +2007,15 @@ class DataLink(QObject):
             qt.hide(self.label_fps)
             qt.show(fps_combo)
 
+        # disable buttons waiting for confirm
+        if not self.enable_request_type_actors:
+            qt.disable(self.button_send)
+        if not self.enable_request_type_motions:
+            qt.disable(self.button_animation)
+        if not self.enable_request_type_scene:
+            qt.disable(self.button_send_scene)
+
+        # context info
         if avatar:
             self.context_frame.show()
             self.info_label_name.setText(avatar.GetName())
@@ -2093,13 +2110,27 @@ class DataLink(QObject):
             self.toggle_use_fake_user.setIcon(self.icon_fake_user_off)
         self.use_fake_user = self.toggle_use_fake_user.isChecked()
 
-
     def update_toggle_set_keyframes(self):
         if self.toggle_set_keyframes.isChecked():
             self.toggle_set_keyframes.setIcon(self.icon_set_keyframes_on)
         else:
             self.toggle_set_keyframes.setIcon(self.icon_set_keyframes_off)
         self.set_keyframes = self.toggle_set_keyframes.isChecked()
+
+    def allow_request_type(self, request_type, enable):
+        if request_type == "ACTORS":
+            self.enable_request_type_actors = enable
+        elif request_type == "MOTIONS":
+            self.enable_request_type_motions = enable
+        elif request_type == "SCENE":
+            self.enable_request_type_scene = enable
+        self.update_ui()
+        return
+
+    def reset_request_types(self, enable=True):
+        self.enable_request_type_actors = enable
+        self.enable_request_type_motions = enable
+        self.enable_request_type_scene = enable
 
     def show_link_state(self):
         link_service = self.get_link_service()
@@ -2165,6 +2196,7 @@ class DataLink(QObject):
         link_service = self.get_link_service()
         if link_service:
             link_service.service_stop()
+            self.reset_request_types()
 
     def link_disconnect(self):
         link_service = self.get_link_service()
@@ -2234,11 +2266,14 @@ class DataLink(QObject):
         if op_code == OpCodes.CONFIRM:
             self.receive_confirm(data)
 
-        error_show()
+        if op_code == OpCodes.RELINK:
+            self.receive_relink(data)
 
+        error_show()
 
     def on_connected(self):
         self.update_ui()
+        self.reset_request_types()
         self.send_notify("Connected")
 
     def send(self, op_code, data=None):
@@ -2605,6 +2640,27 @@ class DataLink(QObject):
         })
         self.send(OpCodes.CAMERA, export_data)
         self.update_link_status(f"Camera Sent: {actor.name}")
+
+    def send_relink(self):
+        actor = self.get_active_actor()
+        relink_data = encode_from_json({
+            "link_id": actor.get_link_id(),
+            "name": actor.name,
+            "type": actor.get_type(),
+        })
+        self.send(OpCodes.RELINK, relink_data)
+        self.update_link_status(f"Relink Sent: {actor.name} {actor.get_link_id()}")
+
+    def receive_relink(self, data):
+        relink_data = decode_to_json(data)
+        utils.log_info(f"relink reply: {relink_data}")
+        from_link_id = relink_data.get("link_id")
+        to_link_id = relink_data.get("to_link_id")
+        source_name = relink_data.get("name")
+        actor = LinkActor.find_actor(from_link_id, search_name=source_name)
+        if actor:
+            actor.set_link_id(to_link_id)
+            self.update_link_status(f"LinkId Sync: {actor.name} {to_link_id}")
 
     def send_actors_request(self):
         if not self.is_connected():
@@ -3701,7 +3757,7 @@ class DataLink(QObject):
         # get actors
         actors = self.get_selected_actors()
         if actors:
-            self.update_link_status(f"Sending Request")
+            self.update_link_status(f"Sending Request, waiting for response ...")
             self.send_notify(f"Request")
             # send request
             request_data = self.encode_request_data(actors, request_type)
@@ -3709,6 +3765,8 @@ class DataLink(QObject):
             # store the actors
             self.data.sequence_actors = actors
             self.data.sequence_type = request_type
+            # disable buttons for further requests ...
+            self.allow_request_type(request_type, False)
 
     def send_pose_request(self):
         self.send_request("POSE")
@@ -3765,6 +3823,7 @@ class DataLink(QObject):
             self.send_sequence()
         elif request_type in ["SCENE", "MOTIONS", "ACTORS"]:
             self.do_send_update_actors(actors_data, request_type)
+            self.allow_request_type(request_type, True)
         error_show()
         return
 

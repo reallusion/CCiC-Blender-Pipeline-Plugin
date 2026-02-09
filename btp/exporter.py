@@ -1079,7 +1079,7 @@ class Exporter:
             # expression
             expression_data = json_data.get_expression_set()
             FC: RIFaceComponent = self.avatar.GetFaceComponent()
-            SC = self.avatar.GetSkeletonComponent()
+            SC = cc.safe_get_skeleton_component(self.avatar)
             if not expression_data and FC and SC:
 
                 FACIAL_EXPRESSION_PREFIXES = [
@@ -1173,7 +1173,7 @@ class Exporter:
             for obj in objects:
                 obj_name = obj.GetName()
                 try:
-                    SC: RISkeletonComponent = obj.GetSkeletonComponent()
+                    SC = cc.safe_get_skeleton_component(obj)
                     root_bone = SC.GetRootBone()
                     skin_bones = SC.GetSkinBones()
                 except:

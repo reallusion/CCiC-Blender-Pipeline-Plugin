@@ -24,42 +24,46 @@ BONES = []
 
 def bone_test():
     for obj in RScene.GetSelectedObjects():
-        SC: RISkeletonComponent = obj.GetSkeletonComponent()
-        bones = SC.GetSkinBones()
-        for bone in bones:
-            if bone.GetName() == "CC_Base_L_ToeBase":
-                pos = SC.GetBoneTPosePosition(bone)
-                pos.y + 100
-                SC.SetBoneTPosePosition(bone, pos)
+        SC = cc.safe_get_skeleton_component(obj)
+        if SC:
+            bones = SC.GetSkinBones()
+            for bone in bones:
+                if bone.GetName() == "CC_Base_L_ToeBase":
+                    pos = SC.GetBoneTPosePosition(bone)
+                    pos.y + 100
+                    SC.SetBoneTPosePosition(bone, pos)
 
 
 def clip_test():
     for obj in RScene.GetSelectedObjects():
-        SC: RISkeletonComponent = obj.GetSkeletonComponent()
-        clip_count = SC.GetClipCount()
-        clip = SC.GetClip(0)
-        print(clip_count)
-        print(clip)
-        print(dir(clip))
-        print(clip.GetName())
+        SC = cc.safe_get_skeleton_component(obj)
+        if SC:
+            clip_count = SC.GetClipCount()
+            clip = SC.GetClip(0)
+            print(clip_count)
+            print(clip)
+            print(dir(clip))
+            print(clip.GetName())
 
 
 def get_control_position(avatar: RIAvatar, effector, clip: RIClip, time: RTime):
-    SC: RISkeletonComponent = avatar.GetSkeletonComponent()
-    effector = SC.GetEffector(effector)
-    effector_settings = clip.GetDataBlock("Layer", effector)
-    clip_time = clip.SceneTimeToClipTime(time)
-    f_control_x: RFloatControl = effector_settings.GetControl("Position/PositionX")
-    f_control_y: RFloatControl = effector_settings.GetControl("Position/PositionY")
-    f_control_z: RFloatControl = effector_settings.GetControl("Position/PositionZ")
     x = y = z = 0
-    f_control_x.ClearKeys()
-    f_control_y.ClearKeys()
-    f_control_z.ClearKeys()
-    x = f_control_x.GetValue(clip_time, x, -1)[1]
-    y = f_control_y.GetValue(clip_time, y, -1)[1]
-    z = f_control_z.GetValue(clip_time, z, -1)[1]
-    #f_control_z.SetValue(tz, 5)
+    SC = cc.safe_get_skeleton_component(avatar)
+    if SC:
+        effector = SC.GetEffector(effector)
+        effector_settings = clip.GetDataBlock("Layer", effector)
+        clip_time = clip.SceneTimeToClipTime(time)
+        f_control_x: RFloatControl = effector_settings.GetControl("Position/PositionX")
+        f_control_y: RFloatControl = effector_settings.GetControl("Position/PositionY")
+        f_control_z: RFloatControl = effector_settings.GetControl("Position/PositionZ")
+
+        f_control_x.ClearKeys()
+        f_control_y.ClearKeys()
+        f_control_z.ClearKeys()
+        x = f_control_x.GetValue(clip_time, x, -1)[1]
+        y = f_control_y.GetValue(clip_time, y, -1)[1]
+        z = f_control_z.GetValue(clip_time, z, -1)[1]
+        #f_control_z.SetValue(tz, 5)
     return RVector3(x, y, z)
 
 

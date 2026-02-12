@@ -1815,6 +1815,8 @@ class DataLink(QObject):
         self.info_label_type = qt.label(grid, "", row=0, col=3, no_size=True)
         qt.label(grid, "Link ID", style=qt.STYLE_BOLD, row=1, col=0)
         self.info_label_link_id = qt.label(grid, "", row=1, col=1, no_size=True)
+        qt.button(grid, "", self.send_relink, qt.get_icon("FullBodyMorph.png"),
+                  icon_size=40, row=0, row_span=2, col=4)
 
         qt.hide(self.label_fps)
         self.show_link_state()
@@ -2517,12 +2519,26 @@ class DataLink(QObject):
         remote_id = self.send_remote_files(export_folder)
         # Send Avartar
         self.send_notify(f"Avatar Import: {actor.name}")
+        link_fps = self.get_link_fps()
+        start_time: RTime = RGlobal.GetStartTime()
+        end_time: RTime = RGlobal.GetEndTime()
+        start_frame = link_fps.GetFrameIndex(start_time)
+        end_frame = link_fps.GetFrameIndex(end_time)
+        current_time: RTime = RGlobal.GetTime()
+        current_frame = link_fps.GetFrameIndex(current_time)
         export_data = encode_from_json({
             "path": export_path,
             "remote_id": remote_id,
             "name": actor.name,
             "type": actor.get_type(),
             "link_id": actor.get_link_id(),
+            "fps": link_fps.ToFloat(),
+            "start_time": start_time.ToInt(),
+            "end_time": end_time.ToInt(),
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "time": current_time.ToInt(),
+            "frame": current_frame,
             "motion_prefix": self.motion_prefix,
             "use_fake_user": self.use_fake_user,
             "set_keyframes": self.set_keyframes,
@@ -2552,12 +2568,26 @@ class DataLink(QObject):
         remote_id = self.send_remote_files(export_folder)
         # Send Prop
         self.send_notify(f"Prop Import: {actor.name}")
+        link_fps = self.get_link_fps()
+        start_time: RTime = RGlobal.GetStartTime()
+        end_time: RTime = RGlobal.GetEndTime()
+        start_frame = link_fps.GetFrameIndex(start_time)
+        end_frame = link_fps.GetFrameIndex(end_time)
+        current_time: RTime = RGlobal.GetTime()
+        current_frame = link_fps.GetFrameIndex(current_time)
         export_data = encode_from_json({
             "path": export_path,
             "remote_id": remote_id,
             "name": actor.name,
             "type": actor.get_type(),
             "link_id": actor.get_link_id(),
+            "fps": link_fps.ToFloat(),
+            "start_time": start_time.ToInt(),
+            "end_time": end_time.ToInt(),
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "time": current_time.ToInt(),
+            "frame": current_frame,
             "motion_prefix": self.motion_prefix,
             "use_fake_user": self.use_fake_user,
             "set_keyframes": self.set_keyframes,
@@ -2596,12 +2626,26 @@ class DataLink(QObject):
         remote_id = self.send_remote_files(export_folder)
         # Send Lights and Cameras
         self.send_notify(f"Lights / Cameras Import: {names}")
+        link_fps = self.get_link_fps()
+        start_time: RTime = RGlobal.GetStartTime()
+        end_time: RTime = RGlobal.GetEndTime()
+        start_frame = link_fps.GetFrameIndex(start_time)
+        end_frame = link_fps.GetFrameIndex(end_time)
+        current_time: RTime = RGlobal.GetTime()
+        current_frame = link_fps.GetFrameIndex(current_time)
         export_data = encode_from_json({
             "path": exported_paths[0],
             "remote_id": remote_id,
             "names": names,
             "types": types,
             "link_ids": link_ids,
+            "fps": link_fps.ToFloat(),
+            "start_time": start_time.ToInt(),
+            "end_time": end_time.ToInt(),
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "time": current_time.ToInt(),
+            "frame": current_frame,
             "motion_prefix": self.motion_prefix,
             "use_fake_user": self.use_fake_user,
             "set_keyframes": self.set_keyframes,
@@ -2628,12 +2672,26 @@ class DataLink(QObject):
         remote_id = self.send_remote_files(export_folder)
         # Send Camera
         self.send_notify(f"Camera Import: {actor.name}")
+        link_fps = self.get_link_fps()
+        start_time: RTime = RGlobal.GetStartTime()
+        end_time: RTime = RGlobal.GetEndTime()
+        start_frame = link_fps.GetFrameIndex(start_time)
+        end_frame = link_fps.GetFrameIndex(end_time)
+        current_time: RTime = RGlobal.GetTime()
+        current_frame = link_fps.GetFrameIndex(current_time)
         export_data = encode_from_json({
             "path": export_path,
             "remote_id": remote_id,
             "name": actor.name,
             "type": actor.get_type(),
             "link_id": actor.get_link_id(),
+            "fps": link_fps.ToFloat(),
+            "start_time": start_time.ToInt(),
+            "end_time": end_time.ToInt(),
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "time": current_time.ToInt(),
+            "frame": current_frame,
             "motion_prefix": self.motion_prefix,
             "use_fake_user": self.use_fake_user,
             "set_keyframes": self.set_keyframes,
@@ -2728,12 +2786,29 @@ class DataLink(QObject):
             remote_id = self.send_remote_files(export_folder)
             # Send Update/Replace
             self.send_notify(f"Update / Replace Import: {actor.name}")
+            link_fps = self.get_link_fps()
+            start_time: RTime = RGlobal.GetStartTime()
+            end_time: RTime = RGlobal.GetEndTime()
+            start_frame = link_fps.GetFrameIndex(start_time)
+            end_frame = link_fps.GetFrameIndex(end_time)
+            current_time: RTime = RGlobal.GetTime()
+            current_frame = link_fps.GetFrameIndex(current_time)
             update_data = encode_from_json({
                 "path": export_path,
                 "remote_id": remote_id,
                 "name": actor.name,
                 "type": actor.get_type(),
                 "link_id": actor.get_link_id(),
+                "fps": link_fps.ToFloat(),
+                "start_time": start_time.ToInt(),
+                "end_time": end_time.ToInt(),
+                "start_frame": start_frame,
+                "end_frame": end_frame,
+                "time": current_time.ToInt(),
+                "frame": current_frame,
+                "motion_prefix": self.motion_prefix,
+                "use_fake_user": self.use_fake_user,
+                "set_keyframes": self.set_keyframes,
                 "replace": avatars[id]["replace"],
                 "objects": objects,
             })
@@ -2879,12 +2954,26 @@ class DataLink(QObject):
         actor = LinkActor(avatar)
         self.update_link_status(f"Exporting Avatar: {actor.name}", True)
         self.send_notify(f"Exporting Avatar: {actor.name}")
+        link_fps = self.get_link_fps()
+        start_time: RTime = RGlobal.GetStartTime()
+        end_time: RTime = RGlobal.GetEndTime()
+        start_frame = link_fps.GetFrameIndex(start_time)
+        end_frame = link_fps.GetFrameIndex(end_time)
+        current_time: RTime = RGlobal.GetTime()
+        current_frame = link_fps.GetFrameIndex(current_time)
         export_data = encode_from_json({
             "path": fbx_path,
             "remote_id": "",
             "name": actor.name,
             "type": actor.get_type(),
             "link_id": actor.get_link_id(),
+            "fps": link_fps.ToFloat(),
+            "start_time": start_time.ToInt(),
+            "end_time": end_time.ToInt(),
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "time": current_time.ToInt(),
+            "frame": current_frame,
             "motion_prefix": self.motion_prefix,
             "use_fake_user": self.use_fake_user,
             "set_keyframes": self.set_keyframes,
@@ -2906,12 +2995,26 @@ class DataLink(QObject):
         types = [ actor.get_type() for actor in actors ]
         self.update_link_status(f"Sending Lights /  Cameras: {names}", True)
         self.send_notify(f"Lights / Cameras Import: {names}")
+        link_fps = self.get_link_fps()
+        start_time: RTime = RGlobal.GetStartTime()
+        end_time: RTime = RGlobal.GetEndTime()
+        start_frame = link_fps.GetFrameIndex(start_time)
+        end_frame = link_fps.GetFrameIndex(end_time)
+        current_time: RTime = RGlobal.GetTime()
+        current_frame = link_fps.GetFrameIndex(current_time)
         export_data = encode_from_json({
             "path": fbx_path,
             "remote_id": "",
             "names": names,
             "types": types,
             "link_ids": link_ids,
+            "fps": link_fps.ToFloat(),
+            "start_time": start_time.ToInt(),
+            "end_time": end_time.ToInt(),
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "time": current_time.ToInt(),
+            "frame": current_frame,
             "motion_prefix": self.motion_prefix,
             "use_fake_user": self.use_fake_user,
             "set_keyframes": self.set_keyframes,

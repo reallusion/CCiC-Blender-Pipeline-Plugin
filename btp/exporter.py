@@ -841,7 +841,9 @@ class Exporter:
 
         options2 = (EExportFbxOptions2__None | EExportFbxOptions2_ResetBoneScale
                                              | EExportFbxOptions2_ResetSelfillumination
-                                             | EExportFbxOptions2_RenameDuplicateMaterialName)
+                                             | EExportFbxOptions2_RenameDuplicateMaterialName
+                                            #| EExportFbxOptions2_RenameDuplicateMorphName
+                                             )
 
         options3 = (EExportFbxOptions3__None | EExportFbxOptions3_ExportJson
                                              | EExportFbxOptions3_ExportVertexColor)
@@ -940,7 +942,9 @@ class Exporter:
             options1 = options1 | EExportFbxOptions_RemoveAllMeshKeepMorph
 
         options2 = (EExportFbxOptions2__None | EExportFbxOptions2_ResetBoneScale
-                                             | EExportFbxOptions2_ResetSelfillumination)
+                                             | EExportFbxOptions2_ResetSelfillumination
+                                            #| EExportFbxOptions2_RenameDuplicateMorphName
+                                             )
 
         options3 = (EExportFbxOptions3__None)
 
@@ -1075,7 +1079,7 @@ class Exporter:
             # expression
             expression_data = json_data.get_expression_set()
             FC: RIFaceComponent = self.avatar.GetFaceComponent()
-            SC = self.avatar.GetSkeletonComponent()
+            SC = cc.safe_get_skeleton_component(self.avatar)
             if not expression_data and FC and SC:
 
                 FACIAL_EXPRESSION_PREFIXES = [
@@ -1169,7 +1173,7 @@ class Exporter:
             for obj in objects:
                 obj_name = obj.GetName()
                 try:
-                    SC: RISkeletonComponent = obj.GetSkeletonComponent()
+                    SC = cc.safe_get_skeleton_component(obj)
                     root_bone = SC.GetRootBone()
                     skin_bones = SC.GetSkinBones()
                 except:

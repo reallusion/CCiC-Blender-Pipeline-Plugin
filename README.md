@@ -71,6 +71,12 @@ Known Issues
 Changelog
 =========
 
+### 2.4.0
+- Fix/Update to mesh replace.
+- Fix to expression import/update for Go-CC.
+- DataLink motion exports use Blender FPS (when connected).
+- Fix for iClone 8.7 accessory export API issue.
+
 ### 2.3.4
 - Blender Scripts Transformer fix added.
 - DataLink export uses Blender scene FPS.

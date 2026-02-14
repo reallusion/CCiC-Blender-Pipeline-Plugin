@@ -389,6 +389,18 @@ def datetimes():
     return time.strftime("%Y%m%d%H%M%S")
 
 
+def search_replace_file(file_path_in: str, search: str, replace: str, file_path_out: str=None):
+    if not file_path_out:
+        file_path_out = file_path_in
+    with open(file_path_in, "r") as f:
+        file_text: str = f.read()
+    if search and replace and search != replace:
+        file_text = file_text.replace(search, replace)
+    with open(file_path_out, "w") as f:
+        f.write(file_text)
+    return file_path_out
+
+
 def contains_path(path1, path2):
     """Returns True if path2 is a parent path of path1"""
     if not os.path.isdir(path1):

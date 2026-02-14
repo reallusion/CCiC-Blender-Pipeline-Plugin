@@ -25,6 +25,11 @@ from . import vars, utils, cc, qt, options, morph
 
 FBX_IMPORTER = None
 
+PARAM_REMAP = {
+    "SSS Roughness Lerp": "Lerp",
+    "SSS Transmission Decay Scale": "DecayScale",
+}
+
 class Importer:
     path = "C:/folder/dummy.fbx"
     folder = "C:/folder"
@@ -679,9 +684,16 @@ class Importer:
                 for param in shader_params:
                     json_value = None
                     if param.startswith("SSS "):
-                        json_value = M.mat_json.get_sss_var(param[4:])
+                        lookup_param = PARAM_REMAP[param] if param in PARAM_REMAP else param[4:]
+                        json_value = M.mat_json.get_sss_var(lookup_param)
+                        #if param == "SSS Roughness Lerp":
+                        #    json_value = 1 - (1 - json_value) / 10
                     else:
-                        json_value = M.mat_json.get_custom_shader_var(param)
+                        lookup_param = PARAM_REMAP[param] if param in PARAM_REMAP else param
+                        json_value = M.mat_json.get_custom_shader_var(lookup_param)
+                        #if M.get_shader() == "RLSSS":
+                        #    if param == "Micro Roughness Scale":
+                        #        json_value = min(json_value, -0.2)
                     if json_value is not None:
                         M.set_shader_parameter(param, json_value)
 
@@ -774,8 +786,11 @@ class Importer:
                             sliders.extend(categories_json[category])
                             utils.log(f"Importing Gathered Expressions: ...")
                             utils.log(f" - Path: {self.path}")
-                            res: RLPy.RStatus = facial_profile.ImportMorphs(self.path, True, sliders, category)
-
+                            #if categories_json[category]:
+                            #    res: RLPy.RStatus = facial_profile.ImportMorphs(self.path, True, categories_json[category], category)
+                            #    if res.IsError():
+                            #        utils.log_error(f"Expression import failed!")
+                    res: RLPy.RStatus = facial_profile.ImportMorphs(self.path, True, sliders, "CUSTOM")
                     if res.IsError():
                         utils.log_error(f"Expression import failed!")
 

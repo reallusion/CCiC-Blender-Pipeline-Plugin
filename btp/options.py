@@ -31,7 +31,7 @@ class Options():
     CC_USE_FACIAL_EXPRESSIONS: bool = True
     CC_DELETE_HIDDEN_FACES: bool = False
     CC_BAKE_TEXTURES: bool = False
-    CC_EXPORT_MODE: str = "Animation"
+    CC_EXPORT_MODE: str = "Animation" # "No Animation", "Current Pose", "Animation"
     CC_EXPORT_MAX_SUB_LEVEL: int = -1
     CC_EXPORT_FPS: float = 0.0
     IC_USE_FACIAL_PROFILE: bool = False
@@ -39,7 +39,7 @@ class Options():
     IC_USE_FACIAL_EXPRESSIONS: bool = False
     IC_DELETE_HIDDEN_FACES: bool = True
     IC_BAKE_TEXTURES: bool = True
-    IC_EXPORT_MODE: str = "Animation"
+    IC_EXPORT_MODE: str = "Animation" # "No Animation", "Current Pose", "Animation"
     IC_EXPORT_MAX_SUB_LEVEL: int = -1
     IC_EXPORT_FPS: float = 0.0
     # Export prefs
@@ -58,6 +58,12 @@ class Options():
     #
     TOOLBAR_STATE_CC: bool = True
     TOOLBAR_STATE_IC: bool = True
+
+    def get_export_animation(self):
+        if is_cc():
+            return self.CC_EXPORT_MODE
+        else:
+            return self.IC_EXPORT_MODE
 
     def get_export_fps(self):
         if self.EXPORT_FPS < 0.1:

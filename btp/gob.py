@@ -70,17 +70,17 @@ def go_b():
 
     # prefer using avatar names over prop names
     avatars = cc.get_selected_avatars()
-    if cc.is_cc5():
+    if cc.is_cc(5.0):
         if avatars:
             name = f"CC5 - {avatars[0].GetName()}"
         elif objects:
             name = f"CC5 - {objects[0].GetName()}"
-    elif cc.is_cc4():
+    elif cc.is_cc(4.0):
         if avatars:
             name = f"CC4 - {avatars[0].GetName()}"
         elif objects:
             name = f"CC4 - {objects[0].GetName()}"
-    elif cc.is_iclone8:
+    elif cc.is_iclone(8.0):
         if avatars:
             name = f"iClone8 - {avatars[0].GetName()}"
         elif objects:
@@ -174,6 +174,7 @@ def go_b_finish():
     GOB_QUEUE = None
     GOB_LIGHTING = False
     LINK = link.get_data_link()
+    LINK.send_fps()
     # finally pose the characters ()
     LINK.send_frame_sync()
     LINK.send_save()

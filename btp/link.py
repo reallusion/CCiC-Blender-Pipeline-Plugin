@@ -3705,10 +3705,11 @@ class DataLink(QObject):
                 obj = skin_def["object"]
                 SC: RISkeletonComponent = skin_def["SC"]
                 RGlobal.RemoveAllAnimations(obj)
-                clip = SC.AddClip(t0)
+                clip: RIClip = SC.AddClip(t0)
                 if clip:
                     clip.SetLength(length)
                     skin_def["clip"] = clip
+                    RGlobal.ObjectModified(obj, EObjectModifiedType_Motion | EObjectModifiedType_Attribute)
                 else:
                     skin_def["clip"] = None
                     log_error(f"Unable to create animation clip: {obj.GetName()} ({obj_id})")

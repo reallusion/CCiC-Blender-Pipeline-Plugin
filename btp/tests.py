@@ -512,4 +512,4 @@ def prop_clip_test():
         RGlobal.ObjectModified(obj, EObjectModifiedType_Motion)
 
 def test():
-    prop_clip_test()
+    dump_params()

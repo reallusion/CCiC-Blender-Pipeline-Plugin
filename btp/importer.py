@@ -15,10 +15,10 @@
 # along with CC/iC-Blender-Pipeline-Plugin.  If not, see <https://www.gnu.org/licenses/>.
 
 import RLPy
-from PySide2.QtWidgets import *
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from shiboken2 import wrapInstance
+from PySide6.QtWidgets import *
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from shiboken6 import wrapInstance
 import os, time, shutil
 from . import vars, utils, cc, qt, options, morph
 

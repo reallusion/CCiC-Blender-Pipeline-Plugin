@@ -16,10 +16,11 @@
 
 from RLPy import *
 del abs
-from PySide2.QtWidgets import *
-from PySide2.QtCore import *
-from PySide2.QtGui import *
-from shiboken2 import wrapInstance
+from PySide6.QtWidgets import *
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from PySide6.QtGui import QIcon
+from shiboken6 import wrapInstance
 import os, socket, select, struct, time, json, atexit, traceback, shutil
 from . import vars, utils, cc, qt, options, prefs, tests, importer, exporter, morph, gob
 from . utils import LI, LW, LD, log_info, log_detail, log_warn, log_error

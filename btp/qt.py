@@ -17,11 +17,12 @@
 import RLPy
 import time
 from . import utils
-from PySide2.QtWidgets import *
-from PySide2.QtCore import *
-from PySide2.QtCore import Qt, Signal, QSize, QRect, QPoint, QTimer
-from PySide2.QtGui import *
-from shiboken2 import wrapInstance
+from PySide6.QtWidgets import *
+from PySide6.QtCore import *
+from PySide6.QtCore import Qt, Signal, QSize, QRect, QPoint, QTimer
+from PySide6.QtGui import *
+from PySide6.QtGui import QIcon
+from shiboken6 import wrapInstance
 
 
 STYLE_NONE = ""

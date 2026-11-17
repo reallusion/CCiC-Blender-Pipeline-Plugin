@@ -17,7 +17,7 @@
 import RLPy, os
 from btp import vars, prefs, error, options, utils, cc, qt, tests, importer, exporter, morph, link, gob
 
-rl_plugin_info = { "ap": "iClone", "ap_version": "8.0" }
+rl_plugin_info = { "ap": "iClone", "ap_version": '9.0' }
 
 FBX_IMPORTER: importer.Importer = None
 BLOCK_UPDATE = False

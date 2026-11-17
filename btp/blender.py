@@ -15,7 +15,7 @@
 # along with CC/iC-Blender-Pipeline-Plugin.  If not, see <https://www.gnu.org/licenses/>.
 
 import RLPy
-from PySide2 import *
+from PySide6 import *
 from . import cc
 
 
